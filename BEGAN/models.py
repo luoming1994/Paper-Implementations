@@ -63,7 +63,7 @@ class Discriminator(nn.Module):
                              nn.Conv2d(ndf, nc, kernel_size=3, stride=1, padding=1),
                              nn.Tanh())
 
-	self.ndf = ndf
+		self.ndf = ndf
         self.imageSize = imageSize
 
     def forward(self,x):

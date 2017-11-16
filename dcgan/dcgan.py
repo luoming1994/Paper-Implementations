@@ -100,6 +100,8 @@ if(opt.cuda):
     real = real.cuda()
     label = label.cuda()
 
+# disable cudnn
+# cudnn.enabled = False
 ########### Training   ###########
 for epoch in range(1,opt.niter+1):
     for i, (images,_) in enumerate(loader):
@@ -112,7 +114,7 @@ for epoch in range(1,opt.niter+1):
 
         output = netD(real)
         errD_real = criterion(output, label)
-        errD_real.backward()
+        #errD_real.backward()
 
         # train with fake data
         label.data.fill_(fake_label)
@@ -123,9 +125,10 @@ for epoch in range(1,opt.niter+1):
         # detach gradients here so that gradients of G won't be updated
         output = netD(fake.detach())
         errD_fake = criterion(output,label)
-        errD_fake.backward()
+        #errD_fake.backward()
 
         errD = errD_fake + errD_real
+		errD.backward()
         optimizerD.step()
 
         ########### fGx ###########

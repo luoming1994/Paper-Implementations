@@ -3,6 +3,7 @@ import torch.nn as nn
 class Discriminator(nn.Module):
     def __init__(self,nc,ndf):
         super(Discriminator,self).__init__()
+		# H_out = floor{ [H_in + 2*padding - dilation*(kernerl_size-1) - 1]/stride + 1}
         # 32 x 32
         self.layer1 = nn.Sequential(nn.Conv2d(nc,ndf,kernel_size=4,stride=2,padding=1),
                                  nn.BatchNorm2d(ndf),

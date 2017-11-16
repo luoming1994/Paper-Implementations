@@ -6,6 +6,7 @@ class Generator(nn.Module):
         self.layer1 = nn.Sequential(nn.ConvTranspose2d(nz,ngf*4,kernel_size=4),
                                  nn.BatchNorm2d(ngf*4),
                                  nn.ReLU())
+		# H_out = (H_in -1)*stride - 2padding + kernel_size + output_padding
         # 4 x 4
         self.layer2 = nn.Sequential(nn.ConvTranspose2d(ngf*4,ngf*2,kernel_size=4,stride=2,padding=1),
                                  nn.BatchNorm2d(ngf*2),
@@ -17,7 +18,8 @@ class Generator(nn.Module):
         # 16 x 16
         self.layer4 = nn.Sequential(nn.ConvTranspose2d(ngf,nc,kernel_size=4,stride=2,padding=1),
                                  nn.Tanh())
-
+		# 32 x 32
+	
     def forward(self,x):
         out = self.layer1(x)
         out = self.layer2(out)
