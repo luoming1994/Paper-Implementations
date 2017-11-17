@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import numpy as np
 import os
 import random
 import torch
@@ -16,10 +17,8 @@ from model import leNet
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
-parser.add_argument('--imageSize', type=int, default=32, help='the height / width of the input image to network')
-parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
 parser.add_argument('--ndf', type=int, default=64)
-parser.add_argument('--niter', type=int, default=25, help='number of epochs to train for')
+parser.add_argument('--niter', type=int, default=20, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
@@ -45,15 +44,23 @@ torch.manual_seed(opt.manualSeed)
 if opt.cuda:
     torch.cuda.manual_seed_all(opt.manualSeed)
 ###############   DATASET   ##################
-dataset = dset.MNIST(root = '../data/',
-                    transform=transforms.Compose([
-                    transforms.Scale(opt.imageSize),
-                    transforms.ToTensor(),
-                    ]),
+train_dataset = dset.MNIST(root = '../data/',
+					train = True,
+                    transform = transforms.ToTensor(),
+					#transform=transforms.Compose([transforms.Scale(opt.imageSize),transforms.ToTensor()]),
                     download = True)
-loader = torch.utils.data.DataLoader(dataset = dataset,
+train_loader = torch.utils.data.DataLoader(dataset = train_dataset,
                                      batch_size = opt.batchSize,
                                      shuffle = True)
+									 
+test_dataset = dset.MNIST(root = '../data/',
+                              train = False,
+                              transform = transforms.ToTensor(),
+                              download = True)									 
+test_loader = torch.utils.data.DataLoader(dataset = test_dataset,
+                                           batch_size = opt.batchSize,
+                                           shuffle = False)
+									 
 #other args
 cudnn.benchmark = True
 nc = 1
@@ -61,35 +68,63 @@ net = leNet(nc,opt.ndf)
 if(opt.cuda):
     net.cuda()
 
-#images = torch.FloatTensor(opt.batchSize,nc,opt.imageSize,opt.imageSize)
-#label = torch.FloatTensor(opt.batchSize,nc,1,1)
-#images = Variable(images)
-#label = Variable(label)
-#if(opt.cuda):
-#    images = images.cuda()
-#    label = label.cuda()
-
-
 optimizer = optim.SGD(net.parameters(),lr=0.001,momentum=0.9)	
 criterion = nn.CrossEntropyLoss()
-for epoch in range(opt.niter+1):
-	for indx,(images,label) in enumerate(loader):
-		net.zero_grad()
-		#images.data.resize_(images_.size()).copy_(images_)
-		#label.data.resize_(label_.size()).copy_(label_)
-		if(opt.cuda):
-			images = images.cuda()
-			label = label.cuda()
-		images = Variable(images)
-		label = Variable(label)
+net.train()
+with open(r'sample/out.txt','a') as f:
+	for epoch in range(opt.niter):
+		loss_list= []
+		acc_list = []
+		for indx,(images,labels) in enumerate(train_loader):
+			net.zero_grad()
+			#images.data.resize_(images_.size()).copy_(images_)
+			#label.data.resize_(label_.size()).copy_(label_)
+			if(opt.cuda):
+				images = images.cuda()
+				labels = labels.cuda()
+			images = Variable(images)
+			labels = Variable(labels)
 		
-		out = net(images)
-		err = criterion(out,label)
-		err.backward()
-		optimizer.step()
+			out = net(images)
+			err = criterion(out,labels)
+			err.backward()
+			optimizer.step()
+			# calculate acc
+			pre = out.cpu().data.numpy().argmax(axis=1)
+			labels_np = labels.cpu().data.numpy()
+			acc = np.mean(pre ==labels_np)
+			# write loss and acc into file 
+			write_str = '%f %f\n'%(err.data[0],acc)
+			f.write(write_str)
+			loss_list.append(err.data[0])
+			acc_list.append(acc)
+		#print epoch mean loss and acc			
+		print('[%d/%d]Loss: %.4f	Acc: %.4f'
+                  % (epoch, opt.niter,
+                    sum(loss_list)/len(loss_list),sum(acc_list)/len(acc_list)))
+
+net.eval()
+loss_list= []
+acc_list = []
+for indx,(images,labels) in enumerate(test_loader):
+	if(opt.cuda):
+		images = images.cuda()
+		labels = labels.cuda()
+	images = Variable(images)
+	labels = Variable(labels)
+
+    # forward
+	out = net(images)
+	err = criterion(out,labels)
 	
-		print('[%d/%d][%d/%d] Loss: %.4f'
-                  % (epoch, opt.niter, indx, len(loader),
-                     err.data[0]))
+	pre = out.cpu().data.numpy().argmax(axis=1)
+	labels_np = labels.cpu().data.numpy()
+	acc = np.mean(pre ==labels_np)
+	acc_list.append(acc) 
+	loss_list.append(err.data[0])
+	#print('[%d/%d]Acc:%.4f' %(indx, len(test_loader),acc) )
+# logging
+print('[eval]Loss: %.4f	Acc: %.4f. '%(sum(loss_list)/len(loss_list),sum(acc_list)/len(acc_list)) )
 	
 torch.save(net.state_dict(), '%s/net.pth' % (opt.outf))	
+loss = np.loadtxt('sample/out.txt')
